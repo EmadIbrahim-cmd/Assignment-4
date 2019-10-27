@@ -1,0 +1,66 @@
+function [p] = bern(y,theta)
+p=theta.^(y).*(1-theta).^(1-y);
+end
+%%%%%
+function [likeli] = likelihood(toss,theta)
+likeli=1;
+for l=1:1:length(toss)
+    likeli=likeli*bern(toss(l),theta);
+end
+end
+%%%%%%%MAIN MATLAB FILE START HERE
+clear all;close all;clc;
+iterations=100000;
+theta=0:0.001:1;
+std_dev=0.2;
+data=[ones(1,17) zeros(1,3)];
+a_prior=[100 18.25 1];
+b_prior=[100 6.75 1];
+a_posterior=[117 35.25 18];
+b_posterior=[103 9.75 4];
+text_fig=["Left","Middle","Right"];
+
+for m=1:1:3
+
+    pdf_prior = makedist('Beta','a',a_prior(m),'b',b_prior(m));
+    theta_current=0.5;%rand(1);
+    posterior_sample(1)=theta_current;
+    count=1;
+    for l=1:1:iterations
+        delta_theta=std_dev*randn(1);
+        theta_proposed=theta_current+delta_theta;
+        if theta_proposed>=0&&theta_proposed<=1
+p_move(count)=min(1,(pdf(pdf_prior,theta_proposed)*likelihood(data,theta_proposed))/(pdf(pdf_prior,theta_current)*likelihood(data,theta_current)));
+            sample=rand(1);
+            if sample<= p_move(count)
+                count=count+1;
+                posterior_sample(count)=theta_proposed;
+                theta_current=theta_proposed;
+            end
+        end
+    end
+    accept_rate(m)=count/iterations;  
+    fig_no=(m-1)*3+1;
+    figure(fig_no);
+    plot(theta,pdf(pdf_prior,theta));
+    grid on;xlabel('theta');ylabel('p(theta)');
+    str = sprintf('Prior Distrubution-%s column Figure 6.4', text_fig(m));
+    title(str);
+    
+    figure(fig_no+1);
+    for n=1:1:length(theta)
+        likeli(n)=likelihood(data,theta(n));
+    end
+    plot(theta,likeli);
+    grid on;xlabel('theta');ylabel('p(y|theta)');
+    str = sprintf('Likelihood Function-%s column Figure 6.4', text_fig(m));
+    title(str);
+    figure(fig_no+2)
+    h=histogram(posterior_sample,1000,'normalization','pdf');
+    hold on;
+    pdf_posterior_theoretical = makedist('Beta','a',a_posterior(m),'b',b_posterior(m));
+    plot(theta,pdf(pdf_posterior_theoretical,theta),'r','linewidth',2.5);
+    str = sprintf('Posterior-Metropolis,Acceptance=%.2f, %s column Figure 6.4',accept_rate(m),text_fig(m));
+    legend('Metropolis','Theoretical');
+    title(str);grid on;
+end
