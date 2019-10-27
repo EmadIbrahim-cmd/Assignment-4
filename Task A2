@@ -1,0 +1,144 @@
+function [p] = bern(y,theta)
+p=theta.^(y).*(1-theta).^(1-y);
+end
+%%%%%%%%%%%%%%%%%%%%%%%%55
+function [likeli] = likelihood(toss,theta)
+likeli=1;
+for l=1:1:length(toss)
+    likeli=likeli*bern(toss(l),theta);
+end
+end
+%%%%%% Main MATLABFILE STARTS HERE%%%%%%%%%%%%55
+clear all;close all;clc;
+%%%%%%Task A2%%%%%%%%%%%%%
+%%%% Metropolis- No Stan%%%%
+iterations=100000;
+theta=0:0.001:1;
+std_dev=0.5;
+data_y=[1 0 1 1 0 1 1 1 0 1 1 1 1 1];
+data_z=[1 0 0 0 0 0 0 1 1 0];
+a_prior=1;
+b_prior=1;
+a_posterior=[(sum(data_y)+a_prior) (sum(data_z)+a_prior)];%theoritcal to check
+b_posterior=[(length(data_y)-sum(data_y)+b_prior) (length(data_z)-sum(data_z)+b_prior)];%theoritcal to check
+text_fig=["Y","Z"];
+
+for m=1:1:2
+    
+   if m==1
+       data=data_y;
+   else
+       data=data_z;
+   end
+    
+    pdf_prior = makedist('Beta','a',a_prior,'b',b_prior);
+    theta_current=0.5;%rand(1);
+    posterior_sample(1)=theta_current;
+    count=1;
+    for l=1:1:iterations
+        delta_theta=std_dev*randn(1);
+        theta_proposed=theta_current+delta_theta;
+        if theta_proposed>=0&&theta_proposed<=1
+            p_move(count)=min(1,(pdf(pdf_prior,theta_proposed)*likelihood(data,theta_proposed))/(pdf(pdf_prior,theta_current)*likelihood(data,theta_current)));
+            sample=rand(1);
+            if sample<= p_move(count)
+                count=count+1;
+                posterior_sample(count)=theta_proposed;
+                theta_current=theta_proposed;
+            end
+        end
+    end
+    accept_rate(m)=count/iterations;  
+    
+    fig_no=(m-1)*3+1;
+    figure(fig_no);
+    plot(theta,pdf(pdf_prior,theta));
+    grid on;xlabel('theta');ylabel('p(theta)');
+    str = sprintf('Prior Distrubution-%s', text_fig(m));
+    title(str);
+    
+    figure(fig_no+1);
+    for n=1:1:length(theta)
+        likeli(n)=likelihood(data,theta(n));
+    end
+    plot(theta,likeli);
+    grid on;xlabel('theta');ylabel('p(y|theta)');
+    str = sprintf('Likelihood Function-%s', text_fig(m));
+    title(str);
+    
+    figure(fig_no+2)
+    h=histogram(posterior_sample,1000,'normalization','pdf');
+    hold on;
+    pdf_posterior_theoretical = makedist('Beta','a',a_posterior(m),'b',b_posterior(m));
+    plot(theta,pdf(pdf_posterior_theoretical,theta),'r','linewidth',2.5);
+    str = sprintf('Posterior-Metropolis,Acceptance=%.2f, %s',accept_rate(m),text_fig(m));
+    legend('Metropolis','Theoretical');
+    title(str);grid on;
+   
+    if m==1
+        posterior_samples_y=posterior_sample;
+   else
+        posterior_samples_z=posterior_sample;
+   end
+    
+    mean_head(m)=mean(posterior_sample); %%%%%Task A2.i
+    
+    fprintf('%s Coin, The Expected probability of getting a head=%.4f\n',text_fig(m),mean_head(m));
+    
+    
+end
+
+%%%Task A2.i- 95% credible interval %%%
+fprintf('-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-\n');
+%%for y sequence
+lower_level=prctile(posterior_samples_y,2.5);
+higher_level=prctile(posterior_samples_y,97.5);
+fprintf('Y-Coin, credible interval=[%.3f, %.3f]\n',lower_level,higher_level);
+%%for z sequence
+lower_level=prctile(posterior_samples_z,2.5);
+higher_level=prctile(posterior_samples_z,97.5);
+fprintf('Z-Coin, credible interval=[%.3f, %.3f]\n',lower_level,higher_level);
+
+%%%%What is the probability of theta >0.5%%%%
+%%%for y sequence
+[a b]=histcounts(posterior_samples_y,'normalization','pdf');
+index=find(b==0.5);
+binwidth=diff(b);
+prob_theta_y=sum(binwidth(index).*a(index:end));
+fprintf('-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-\n');
+fprintf('Y-Coin, probability of theta >0.5=%.3f]\n',prob_theta_y);
+%%%for y sequence
+[a b]=histcounts(posterior_samples_z,'normalization','pdf');
+index=find(b==0.5);
+binwidth=diff(b);
+prob_theta_z=sum(binwidth(index).*a(index:end));
+fprintf('Z-Coin, probability of theta >0.5=%.3f]\n',prob_theta_z);
+
+%%%%%%%%%%%%%%%%Task A.2.b%%%%%%%%%%%%%%%%
+%%%%Task A.2.b.1
+
+count=0;
+compare_length=min(length(posterior_samples_y),length(posterior_samples_z));
+for m=1:1:compare_length
+    
+   if  posterior_samples_y(m)>posterior_samples_z(m)
+      count=count+1; 
+   end
+    
+end
+probabilty_y_greater_z=count./min(length(posterior_samples_y),length(posterior_samples_z));
+fprintf('-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-\n');
+fprintf('Probability theta y greater than theta z =%.3f\n',probabilty_y_greater_z);
+
+%%%%Task A.2.b.2
+delta_theta=posterior_samples_y(1:compare_length)-posterior_samples_z(1:compare_length);
+lower_level=prctile(delta_theta,2.5);
+higher_level=prctile(delta_theta,97.5);
+fprintf('-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-\n');
+fprintf('Delta theta, credible interval=[%.3f, %.3f]\n',lower_level,higher_level);
+%%%%%%%%Task A.2.b.3
+figure(fig_no+3)
+h=histogram(delta_theta,1000,'normalization','pdf');
+title('Posterior (theta y-theta z)');grid on;
+
+
